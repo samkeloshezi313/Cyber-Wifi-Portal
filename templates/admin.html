@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+{% block title %}SOC Security Dashboard{% endblock %}
+{% block body %}
+<div class="admin-page">
+  <header class="admin-topbar">
+    <div class="admin-topbar-inner">
+      <div class="admin-brand">
+        {{ ui.logo("brand-mark") }}
+        <div>
+          <div class="brand-name">{{ institution }}</div>
+          <div class="brand-subtitle">CAPTIVE PORTAL // SOC TELEMETRY &amp; ML HEURISTICS</div>
+        </div>
+      </div>
+      <div class="admin-nav">
+        <span class="admin-user">[ACTIVE OPERATOR // {{ admin.full_name }} ({{ admin.identifier }})]</span>
+        <form method="post" action="{{ url_for('logout') }}" style="margin: 0;">
+          <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+          <button type="submit" class="admin-logout-btn">Log out</button>
+        </form>
+      </div>
+    </div>
+  </header>
+
+  <main class="dashboard">
+    <div class="dashboard-heading">
+      <div class="eyebrow">AI INTRUSION DEFENSE SYSTEM // LIVE SOC MONITOR</div>
+      <h1 class="dashboard-title">Security Operations Center &amp; Threat Telemetry</h1>
+    </div>
+
+    <!-- Key Metrics Grid -->
+    <section aria-label="Key metrics" class="metric-grid">
+      {% set cards = [
+        ("Total Enrolled", stats.total_users, "metric-blue", "All registered credentials"),
+        ("Active Sessions", stats.active_sessions, "metric-green", "Connected wireless clients"),
+        ("Blocked Accounts", stats.blocked, "metric-red", "Locked or anomalous accounts"),
+        ("Threats Flagged", stats.threats, "metric-orange", "High heuristic severity (24h)")
+      ] %}
+      {% for label, value, css_cls, note in cards %}
+      <div class="metric {{ css_cls }}">
+        <div class="metric-label">{{ label }}</div>
+        <div class="metric-value">{{ "{:,}".format(value) }}</div>
+        <div class="metric-note">{{ note }}</div>
+      </div>
+      {% endfor %}
+    </section>
+
+    <!-- Blocked Accounts & Attempt Resolution -->
+    {% if blocked_users %}
+    <section class="dashboard-section" aria-label="Blocked accounts" style="border-color: rgba(255, 51, 102, 0.45); box-shadow: 0 0 25px rgba(255, 51, 102, 0.1);">
+      <div class="section-head" style="background: rgba(255, 51, 102, 0.08); border-bottom-color: rgba(255, 51, 102, 0.3);">
+        <h2 class="section-title" style="color: #ff8099;">Locked Accounts &amp; Failed Attempts Mitigation</h2>
+        <span class="section-note" style="color: var(--danger); font-weight: 800;">{{ blocked_users|length }} ACCOUNTS CURRENTLY LOCKED</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Account Holder</th>
+              <th>Identifier</th>
+              <th>Lockout Reason</th>
+              <th>Failed Attempts</th>
+              <th>Administrative Action</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for u in blocked_users %}
+            <tr>
+              <td><strong>{{ u.full_name }}</strong></td>
+              <td style="font-family: var(--mono-font); color: var(--cyan);">{{ u.identifier }}</td>
+              <td style="color: #fecdd3;">{{ u.block_reason or 'Exceeded failed attempt threshold' }}</td>
+              <td><span class="severity-chip severity-high">{{ u.fail_count }} failures logged</span></td>
+              <td>
+                <form method="post" action="{{ url_for('admin_unblock_user', ident=u.identifier) }}" style="margin: 0; display: inline-flex; gap: 8px;">
+                  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                  <button type="submit" class="button-small button-positive" style="margin: 0;">Resolve Attempts &amp; Unblock</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    <!-- Quick Attempt Resolver Form -->
+    <div style="margin-bottom: 24px; padding: 14px 18px; border-radius: 14px; background: rgba(9, 14, 28, 0.8); border: 1px solid var(--line); display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px;">
+      <div>
+        <div style="font-size: .84rem; font-weight: 800; color: var(--text);">Resolve Attempts for Any Account</div>
+        <div style="font-size: .76rem; color: var(--muted); font-family: var(--mono-font);">Clears recent failed password/OTP attempts and resets account lockout.</div>
+      </div>
+      <form method="post" action="{{ url_for('admin_resolve_attempts') }}" style="margin: 0; display: flex; gap: 8px; align-items: center;">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <input name="identifier" placeholder="User ID or email address..." required style="width: 220px; padding: 8px 12px; font-size: .82rem; min-height: 36px;">
+        <button type="submit" class="button-small button-secondary" style="margin: 0; min-height: 36px; white-space: nowrap;">Resolve &amp; Unblock</button>
+      </form>
+    </div>
+
+    <!-- Recent Security Alerts & Mitigation Dropdown -->
+    <section class="dashboard-section" aria-label="Recent security alerts">
+      <div class="section-head">
+        <h2 class="section-title">Security Anomaly Alerts</h2>
+        <span class="section-note">STREAM // LATEST 20 LOGGED THREATS</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Threat Classification</th>
+              <th>Target Account</th>
+              <th>Origin IP</th>
+              <th>Mitigation State / Dropdown</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for a in alerts %}
+            <tr>
+              <td style="color: var(--muted); white-space: nowrap; font-family: var(--mono-font);">{{ a.ts|fmt_dt }}</td>
+              <td>
+                <span class="severity-chip {{ 'severity-high' if a.severity == 'high' else 'severity-medium' }}" {% if a.detail %}title="{{ a.detail }}"{% endif %}>
+                  {{ a.threat_type }}
+                </span>
+              </td>
+              <td>
+                <span style="font-family: var(--mono-font);">{{ a.user_identifier or '-' }}</span>
+                {% if a.user_blocked_at %}
+                <span class="severity-chip severity-high" style="margin-left: 6px; font-size: .65rem; padding: 2px 6px;">LOCKED</span>
+                {% endif %}
+              </td>
+              <td style="font-family: var(--mono-font); color: var(--cyan);">{{ a.ip or '-' }}</td>
+              <td>
+                <form method="post" action="{{ url_for('admin_alert_status', alert_id=a.id) }}" style="margin: 0; display: inline-flex; align-items: center; gap: 6px;">
+                  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                  <select name="status" onchange="this.form.submit()" aria-label="Mitigation status" class="alert-select">
+                    {% for s in ['Open','Investigating','Resolved','Dismissed'] %}
+                    <option value="{{ s }}" {{ 'selected' if a.status == s }}>{{ s }}</option>
+                    {% endfor %}
+                    <option value="Dismiss (Unblock User)">Dismiss &amp; Unblock User</option>
+                  </select>
+                  {% if a.user_blocked_at %}
+                  <button type="submit" name="action" value="unblock_now" class="button-small button-positive" style="margin: 0; padding: 4px 8px; font-size: .72rem; min-height: 28px;" title="Dismiss alert and unblock user immediately">
+                    Dismiss &amp; Unblock
+                  </button>
+                  {% endif %}
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5" class="empty-cell">NO INCIDENTS LOGGED // ALL NETWORK PARAMETERS NOMINAL</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Active Connected Users & Session Timers -->
+    <section class="dashboard-section" aria-label="Active sessions">
+      <div class="section-head">
+        <h2 class="section-title">Active Connected Users &amp; Sessions</h2>
+        <span class="section-note">STREAM // {{ active_sessions|length }} CLIENTS ONLINE</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Active User</th>
+              <th>Hardware Signature</th>
+              <th>Assigned Subnet IP</th>
+              <th>Connected At</th>
+              <th>Session Uptime</th>
+              <th>Session Control</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for s in active_sessions %}
+            <tr>
+              <td>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span class="severity-chip" style="background: rgba(0, 255, 170, 0.15); border-color: rgba(0, 255, 170, 0.4); color: var(--ok); font-size: .66rem; padding: 2px 6px;">ACTIVE</span>
+                  <div>
+                    <strong>{{ s.full_name }}</strong>
+                    <span style="color: var(--muted); font-size: .74rem; display: block; font-family: var(--mono-font);">{{ s.identifier }}</span>
+                  </div>
+                </div>
+              </td>
+              <td>{{ s.device_name or 'Unidentified Hardware' }}</td>
+              <td style="font-family: var(--mono-font); color: var(--cyan);">{{ s.ip or '-' }}</td>
+              <td style="color: var(--muted); white-space: nowrap; font-family: var(--mono-font);">{{ s.started_at|fmt_time }}</td>
+              <td>
+                <span class="session-timer-cell" data-start="{{ s.started_at }}" style="font-family: var(--mono-font); color: var(--cyan); font-weight: 700;">
+                  {{ (now - s.started_at)|fmt_duration }}
+                </span>
+              </td>
+              <td>
+                <form method="post" action="{{ url_for('admin_kick_session', sid=s.id) }}" style="margin: 0;">
+                  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                  <button type="submit" class="button-small button-danger" style="margin: 0; min-height: 30px; font-size: .74rem;" title="Terminate this wireless session">
+                    Disconnect
+                  </button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6" class="empty-cell">NO ACTIVE CLIENT SESSIONS IN PROGRESS</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Random Forest Model Analysis -->
+    <section class="dashboard-section" aria-label="Random Forest model">
+      <div class="section-head">
+        <h2 class="section-title">Neural Classifier // Random Forest Engine</h2>
+        <span class="section-note">STEP-UP THRESHOLD // {{ "%.0f"|format(metrics.threshold * 100) }}%</span>
+      </div>
+      <div class="model-content">
+        <div>
+          <p style="color: var(--muted); font-size: .82rem; margin: 0 0 14px; font-family: var(--mono-font);">EVALUATED MODEL METRICS // HOLDOUT VALIDATION</p>
+          <dl class="model-stats">
+            {% for k, label in [('accuracy','Accuracy'),('precision','Precision'),('recall','Recall'),('f1','F1 Score'),('roc_auc','ROC AUC')] %}
+            <div class="model-stat">
+              <dt>{{ label }}</dt>
+              <dd>{{ '%.1f'|format(metrics[k] * 100) }}%</dd>
+            </div>
+            {% endfor %}
+            <div class="model-stat">
+              <dt>Test Samples</dt>
+              <dd style="color: var(--text);">{{ metrics.n_test }}</dd>
+            </div>
+          </dl>
+        </div>
+        <div>
+          <h3 style="font-size: .86rem; font-weight: 700; color: var(--text); margin: 0 0 8px; font-family: var(--mono-font); text-transform: uppercase;">Feature Importance Weights</h3>
+          <ul class="feature-list">
+            {% for f, v in metrics.importances.items()|sort(attribute=1, reverse=true) %}
+            <li>
+              <div class="feature-row">
+                <span>{{ labels[f] }}</span>
+                <span>{{ '%.0f'|format(v * 100) }}%</span>
+              </div>
+              <div class="feature-bar">
+                <span style="width: {{ v * 100 }}%;"></span>
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Live ticking session timer update for active sessions table in admin
+  function updateAdminTimers() {
+    const cells = document.querySelectorAll('.session-timer-cell[data-start]');
+    const now = Math.floor(Date.now() / 1000);
+    cells.forEach(c => {
+      const start = parseFloat(c.getAttribute('data-start'));
+      if (start) {
+        const sec = Math.max(0, Math.floor(now - start));
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        const h = Math.floor(m / 60);
+        const remM = m % 60;
+        if (h > 0) {
+          c.textContent = `${h}h ${String(remM).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+        } else if (m > 0) {
+          c.textContent = `${m}m ${String(s).padStart(2, '0')}s`;
+        } else {
+          c.textContent = `${s}s`;
+        }
+      }
+    });
+  }
+  setInterval(updateAdminTimers, 1000);
+
+  // Confirmation dialogs for destructive actions
+  document.querySelectorAll('.button-danger').forEach(btn => {
+    btn.addEventListener('click', e => {
+      if (!confirm('Are you sure you want to disconnect this session?')) e.preventDefault();
+    });
+  });
+  document.querySelectorAll('.button-positive[type="submit"]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      if (!confirm('Are you sure you want to unblock this account and resolve its failed attempts?')) e.preventDefault();
+    });
+  });
+</script>
+{% endblock %}

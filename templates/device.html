@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Register device{% endblock %}
+{% block content %}
+{{ ui.steps(2, "Hardware Binding") }}
+
+<div class="signal-icon" aria-hidden="true">
+  <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>
+</div>
+
+<h1 class="page-heading">Hardware Fingerprint</h1>
+<p class="page-copy">New hardware signature detected. Confirm device parameters to bind security token.</p>
+
+<dl class="detail-list">
+  <div class="detail-row"><dt>Client Hardware</dt><dd>{{ info.name }}</dd></div>
+  <div class="detail-row"><dt>Operating System</dt><dd>{{ info.os }}</dd></div>
+  <div class="detail-row"><dt>Browser Engine</dt><dd>{{ info.browser }}</dd></div>
+  <div class="detail-row"><dt>Client Network IP</dt><dd>{{ ip }}</dd></div>
+</dl>
+
+<div class="notice">
+  A 6-digit cryptographic verification code will be dispatched to <strong>{{ email }}</strong>.
+</div>
+
+<form method="post">
+  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+  <button type="submit" class="button">Authorize &amp; Bind Device</button>
+</form>
+
+<form method="post" action="{{ url_for('cancel') }}">
+  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+  <button type="submit" class="button button-secondary">Abort &amp; Return</button>
+</form>
+{% endblock %}

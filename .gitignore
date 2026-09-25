@@ -1,0 +1,12 @@
+venv/
+wifi_portal/
+__pycache__/
+*.py[cod]
+instance/
+models/*.joblib
+models/*.json
+.env
+.venv/
+*.sqlite
+*.db
+portal_server.log

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Suspicious login{% endblock %}
+{% block content %}
+{{ ui.steps(5, "Threat Anomaly Detected" if not blocked else "Access Blocked") }}
+
+<div class="signal-icon danger" aria-hidden="true">
+  <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3 2.5 20h19L12 3Z"/><path d="M12 10v4m0 3h.01"/></svg>
+</div>
+
+<h1 class="page-heading danger">Anomaly Detected</h1>
+<p class="page-copy">
+  {% if blocked %}
+    High-risk heuristic threshold exceeded. Session has been locked by automated threat defense.
+  {% else %}
+    Contextual anomaly detected. Step-up multi-factor cryptographic proof is required.
+  {% endif %}
+</p>
+
+<dl class="detail-list danger">
+  <div class="detail-row"><dt>Subnet Origin</dt><dd class="danger">{{ ev.location_label }}</dd></div>
+  <div class="detail-row"><dt>Hardware Profile</dt><dd>{{ dev.name }}</dd></div>
+  <div class="detail-row"><dt>Temporal Window</dt><dd>{{ ev.time_label }}</dd></div>
+  <div class="detail-row"><dt>Failed Attempts (15m)</dt><dd class="danger">{{ ev.features_json|from_json_failed }}</dd></div>
+  <div class="detail-row">
+    <dt>AI Threat Score</dt>
+    <dd><span class="severity-chip severity-high">ANOMALY {{ risk_pct }}%</span></dd>
+  </div>
+</dl>
+
+{% if not blocked %}
+<form method="post" action="{{ url_for('stepup') }}">
+  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+  <button type="submit" class="button button-danger">Initiate Step-Up MFA Challenge</button>
+  <p class="field-help" style="text-align: center; margin-top: 8px; font-family: var(--mono-font);">Challenge token will be dispatched to {{ email }}.</p>
+</form>
+{% endif %}
+
+<form method="post" action="{{ url_for('cancel') }}">
+  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+  <button type="submit" class="button button-secondary">Terminate Session</button>
+</form>
+{% endblock %}

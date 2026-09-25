@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Verify code{% endblock %}
+{% block content %}
+{{ ui.steps(3 if purpose == 'register' else 4, "MFA Verification" if purpose == 'register' else "Extra Verification") }}
+
+<div class="signal-icon" aria-hidden="true">
+  <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+</div>
+
+<h1 class="page-heading">Cryptographic Verification</h1>
+<p class="page-copy">One-time security token dispatched to <strong>{{ email }}</strong>. Valid for 300s.</p>
+
+<form method="post" id="otp-form">
+  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+  <input type="hidden" name="code" id="code">
+  <div class="otp-inputs" role="group" aria-label="6-digit verification code">
+    {% for i in range(6) %}
+    <input class="otp-box" inputmode="numeric" autocomplete="{{ 'one-time-code' if i == 0 else 'off' }}" maxlength="1" aria-label="Digit {{ i+1 }}" {{ 'autofocus' if i == 0 }}>
+    {% endfor %}
+  </div>
+  <button id="verify" disabled class="button">Authenticate Code</button>
+</form>
+
+<form method="post" action="{{ url_for('mfa_resend') }}" class="resend-box">
+  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+  <span>Token not received?</span>
+  <button id="resend" disabled class="button-link">Request new code</button>
+  <span id="timer" style="font-family: var(--mono-font); color: var(--cyan);"></span>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const boxes = [...document.querySelectorAll('.otp-box')];
+  const hidden = document.getElementById('code');
+  const btn = document.getElementById('verify');
+
+  const sync = () => {
+    hidden.value = boxes.map(b => b.value).join('');
+    btn.disabled = hidden.value.length !== 6;
+  };
+
+  boxes.forEach((b, i) => {
+    b.addEventListener('input', () => {
+      b.value = b.value.replace(/\D/g, '').slice(-1);
+      sync();
+      if (b.value && i < 5) boxes[i+1].focus();
+    });
+    b.addEventListener('keydown', e => {
+      if (e.key === 'Backspace' && !b.value && i > 0) boxes[i-1].focus();
+    });
+    b.addEventListener('paste', e => {
+      e.preventDefault();
+      const t = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6);
+      t.split('').forEach((c, j) => { if (boxes[j]) boxes[j].value = c; });
+      sync();
+      boxes[Math.min(t.length, 5)].focus();
+    });
+  });
+
+  let left = {{ wait }};
+  const resend = document.getElementById('resend');
+  const timer = document.getElementById('timer');
+  (function tick() {
+    if (left > 0) {
+      timer.textContent = ' [' + left + 's]';
+      resend.disabled = true;
+      left--;
+      setTimeout(tick, 1000);
+    } else {
+      timer.textContent = '';
+      resend.disabled = false;
+    }
+  })();
+</script>
+{% endblock %}

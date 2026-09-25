@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Connected{% endblock %}
+{% block content %}
+<div class="signal-icon success" aria-hidden="true">
+  <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M2 9a15 15 0 0 1 20 0M5 13a10 10 0 0 1 14 0M8.5 16.5a5 5 0 0 1 7 0"/><circle cx="12" cy="20" r="1"/></svg>
+</div>
+
+<h1 class="page-heading success">Network Link Active</h1>
+<p class="page-copy">Encrypted Wi-Fi lease established for <strong>{{ user.full_name }}</strong> on <strong>{{ ssid }}</strong>.</p>
+
+<!-- Live Cyberpunk Session Timer -->
+<div class="session-timer-card" style="margin: 18px 0; padding: 16px; border-radius: 14px; background: rgba(9, 14, 28, 0.9); border: 1px solid var(--line-cyan); text-align: center; box-shadow: 0 0 25px rgba(34, 211, 238, 0.12);">
+  <div style="font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: var(--cyan); font-family: var(--mono-font); margin-bottom: 6px;">
+    ACTIVE SESSION UPTIME // LIVE TIMER
+  </div>
+  <div id="session-timer" style="font-family: var(--mono-font); font-size: 2.2rem; font-weight: 900; letter-spacing: 2px; color: var(--cyan); text-shadow: 0 0 18px var(--cyan-glow);">
+    00:00:00
+  </div>
+  <div style="margin-top: 6px; font-size: .76rem; color: var(--muted); font-family: var(--mono-font);">
+    Started at: {{ started_at|fmt_time }} ({{ started_at|fmt_dt }})
+  </div>
+</div>
+
+<!-- Active User & Session Details -->
+<dl class="detail-list success">
+  <div class="detail-row">
+    <dt>Active User</dt>
+    <dd style="color: var(--ok);">{{ user.full_name }} <span style="font-size: .76rem; color: var(--muted);">({{ user.identifier }})</span></dd>
+  </div>
+  <div class="detail-row"><dt>User Email</dt><dd>{{ masked_email }}</dd></div>
+  <div class="detail-row"><dt>Wireless SSID</dt><dd>{{ ssid }}</dd></div>
+  <div class="detail-row"><dt>Lease IP Address</dt><dd>{{ ip }}</dd></div>
+  <div class="detail-row"><dt>Bound Hardware</dt><dd>{{ dev.name if dev else 'Active Interface' }}</dd></div>
+  <div class="detail-row"><dt>Security State</dt><dd style="color: var(--ok);">LINK ACTIVE // 256-BIT ENCRYPTED</dd></div>
+</dl>
+
+{% if show_admin_link %}
+<a href="{{ url_for('admin') }}" class="button" style="margin-top: 20px;">Open SOC Analytics Dashboard</a>
+{% endif %}
+
+<form method="post" action="{{ url_for('logout') }}">
+  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+  <button type="submit" class="button button-secondary">Disconnect Network Link</button>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Live Active Session Timer
+  const startTs = {{ started_at }} * 1000;
+  const timerEl = document.getElementById('session-timer');
+
+  function updateTimer() {
+    const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startTs) / 1000));
+    const hours = Math.floor(elapsedSeconds / 3600);
+    const minutes = Math.floor((elapsedSeconds % 3600) / 60);
+    const seconds = elapsedSeconds % 60;
+    
+    const pad = n => String(n).padStart(2, '0');
+    timerEl.textContent = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+  }
+
+  setInterval(updateTimer, 1000);
+  updateTimer();
+
+  // Background check for session revocation by admin
+  setInterval(() => {
+    fetch("{{ url_for('api_session_status') }}")
+      .then(r => r.json())
+      .then(data => {
+        if (!data.active) {
+          window.location.href = "{{ url_for('session_ended') }}";
+        }
+      })
+      .catch(() => {});
+  }, 5000);
+</script>
+{% endblock %}

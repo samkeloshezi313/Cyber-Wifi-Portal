@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Log in{% endblock %}
+{% block content %}
+{{ ui.steps(1, "Authentication") }}
+
+<div class="auth-tabs" role="tablist">
+  <button type="button" id="tab-login" role="tab" class="auth-tab">Sign In</button>
+  <button type="button" id="tab-signup" role="tab" class="auth-tab">Sign Up</button>
+</div>
+
+<form id="form-login" method="post" action="{{ url_for('login') }}">
+  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+  <div class="form-group">
+    <label for="identifier">User Identifier / Email</label>
+    <input id="identifier" name="identifier" required autocomplete="username" placeholder="user@network.local">
+  </div>
+  <div class="form-group">
+    <label for="password">Passcode / Secret Key</label>
+    <input id="password" name="password" type="password" required autocomplete="current-password" placeholder="••••••••">
+  </div>
+
+  {% if show_test_controls %}
+  <details class="test-controls">
+    <summary>SYS.SIM_CONTROLS // TOGGLE</summary>
+    <p>Operational test controls enabled for simulated login behavior.</p>
+    <div class="form-group">
+      <label for="sim_location">Location Origin</label>
+      <select id="sim_location" name="sim_location">
+        <option value="">Auto-detect gateway</option>
+        <option value="new">Simulate unfamiliar subnet (anomalous)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="sim_hour">Temporal Signature</label>
+      <select id="sim_hour" name="sim_hour">
+        <option value="">Current system timestamp</option>
+        <option value="3">Simulate 03:00 (off-peak anomaly)</option>
+      </select>
+    </div>
+  </details>
+  {% endif %}
+
+  <button type="submit" class="button">Authorize Session</button>
+  <div class="foot">
+    <a href="#" data-tab="signup">Create account</a>
+    <a href="{{ url_for('forgot_password') }}" style="font-family: var(--mono-font); font-size: .76rem;">Forgot Password?</a>
+  </div>
+</form>
+
+<form id="form-signup" method="post" action="{{ url_for('signup') }}" class="hidden">
+  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+  <div class="form-group">
+    <label for="full_name">Full Identity / Name</label>
+    <input id="full_name" name="full_name" required autocomplete="name" placeholder="Alex Chen">
+  </div>
+  <div class="form-group">
+    <label for="s_identifier">Student / Staff ID</label>
+    <input id="s_identifier" name="identifier" required placeholder="ST123456">
+  </div>
+  <div class="form-group">
+    <label for="email">Verification Email</label>
+    <input id="email" name="email" type="email" required autocomplete="email" placeholder="user@network.local">
+  </div>
+  <div class="form-group">
+    <label for="s_password">Master Passcode</label>
+    <input id="s_password" name="password" type="password" required minlength="8" autocomplete="new-password" placeholder="••••••••">
+    <p class="field-help" style="font-family: var(--mono-font);">Min 8 chars: uppercase + lowercase + number + special char.</p>
+  </div>
+  <button type="submit" class="button">Enroll Identity</button>
+  <div class="foot">
+    <a href="#" data-tab="login">Already registered? Sign In</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const start = {{ tab|tojson }};
+  function show(t) {
+    document.getElementById('form-login').classList.toggle('hidden', t !== 'login');
+    document.getElementById('form-signup').classList.toggle('hidden', t !== 'signup');
+    for (const k of ['login', 'signup']) {
+      const b = document.getElementById('tab-' + k);
+      if (k === t) {
+        b.classList.add('is-active');
+        b.setAttribute('aria-selected', 'true');
+      } else {
+        b.classList.remove('is-active');
+        b.setAttribute('aria-selected', 'false');
+      }
+    }
+  }
+  document.querySelectorAll('[id^=tab-]').forEach(b => b.onclick = () => show(b.id.slice(4)));
+  document.querySelectorAll('[data-tab]').forEach(a => a.onclick = e => { e.preventDefault(); show(a.dataset.tab); });
+  show(start || 'login');
+</script>
+{% endblock %}

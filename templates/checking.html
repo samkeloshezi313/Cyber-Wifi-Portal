@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Security check{% endblock %}
+{% block content %}
+{{ ui.steps(4, "Neural Risk Assessment") }}
+
+<div class="signal-icon" aria-hidden="true">
+  <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4.5 3.2 8 8 9 4.8-1 8-4.5 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg>
+</div>
+
+<h1 class="page-heading">Neural Risk Assessment</h1>
+<p class="page-copy">Random Forest classifier evaluating contextual heuristics &amp; login telemetry.</p>
+
+<ul id="checks" class="check-list" aria-live="polite">
+  {% for key, label in [('location','Location Geofence Check'),('device','Device Hardware Trust'),('time','Temporal Anomaly Analysis'),('behaviour','Login Velocity & Pattern')] %}
+  <li data-key="{{ key }}" class="check-row">
+    <span class="check-icon" data-icon>•</span>
+    <div class="check-info">
+      <div class="check-label" data-label>{{ label }}</div>
+      <div class="check-detail" data-detail>Evaluating telemetry...</div>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+
+<div class="progress-bar" id="bar-wrap" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+  <div id="bar" class="progress-fill"></div>
+</div>
+<p id="status" class="analysis-status">ANALYZING HEURISTICS... 0%</p>
+
+<p id="error" class="notice hidden" style="border-color: rgba(255,51,102,0.5); background: rgba(255,51,102,0.12); color: #fecdd3; text-align: center;">
+  Telemetry analysis could not be completed. <a href="{{ url_for('login') }}">Return to terminal</a>
+</p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const bar = document.getElementById('bar');
+  const wrap = document.getElementById('bar-wrap');
+  const status = document.getElementById('status');
+  let pct = 0, finished = false;
+
+  const setProgress = p => {
+    pct = p;
+    bar.style.width = p + '%';
+    wrap.setAttribute('aria-valuenow', p);
+    status.textContent = p >= 100 ? 'EVALUATION COMPLETE // 100%' : 'ANALYZING HEURISTICS... ' + p + '%';
+  };
+
+  const creep = setInterval(() => {
+    if (!finished && pct < 85) setProgress(pct + 3);
+  }, 90);
+
+  const statusIcons = {
+    ok: '✓',
+    warn: '!',
+    bad: '✕'
+  };
+
+  fetch("{{ url_for('api_risk_assess') }}", {
+    method: 'POST',
+    headers: { 'X-CSRF-Token': "{{ csrf_token }}" }
+  })
+    .then(r => {
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    })
+    .then(async data => {
+      finished = true;
+      clearInterval(creep);
+      for (const c of data.checks) {
+        const li = document.querySelector('[data-key="' + c.key + '"]');
+        if (li) {
+          li.classList.remove('is-ok', 'is-warn', 'is-bad');
+          li.classList.add('is-' + c.status);
+          const icon = li.querySelector('[data-icon]');
+          icon.textContent = statusIcons[c.status] || '•';
+          li.querySelector('[data-detail]').textContent = c.detail;
+        }
+        setProgress(Math.max(pct, Math.min(96, pct + 12)));
+        await new Promise(r => setTimeout(r, 450));
+      }
+      setProgress(100);
+      setTimeout(() => { location.href = "{{ url_for('result') }}"; }, 600);
+    })
+    .catch(() => {
+      finished = true;
+      clearInterval(creep);
+      document.getElementById('error').classList.remove('hidden');
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Access granted{% endblock %}
+{% block content %}
+{{ ui.steps(5, "Authorization Complete") }}
+
+<div class="signal-icon success" aria-hidden="true">
+  <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>
+</div>
+
+<h1 class="page-heading success">Access Authorized</h1>
+<p class="page-copy">Identity cleared by security heuristics. Wireless session lease is ready.</p>
+
+<dl class="detail-list success">
+  <div class="detail-row"><dt>Network SSID</dt><dd>{{ ssid }}</dd></div>
+  <div class="detail-row"><dt>Assigned IP</dt><dd>{{ ip }}</dd></div>
+  <div class="detail-row"><dt>Authorized Device</dt><dd>{{ dev.name }}</dd></div>
+  <div class="detail-row"><dt>Auth Timestamp</dt><dd>{{ now|fmt_dt }}</dd></div>
+  <div class="detail-row"><dt>Security Protocol</dt><dd style="color: var(--ok);">WPA-ENT &bull; AI-CLEARED</dd></div>
+</dl>
+
+<form method="post" action="{{ url_for('connect') }}">
+  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+  <button type="submit" class="button button-positive">Establish Network Link</button>
+</form>
+{% endblock %}
